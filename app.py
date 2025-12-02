@@ -107,7 +107,7 @@ def main():
     
     initialize_session_state()
     
-    st.header("Chat with Multiple PDFs — Powered by Groq LLM 🚀")
+    st.header("Chat with Multiple PDFs — Powered by Darshak 🚀")
     st.markdown("---")
     
     uploaded_files = render_sidebar_upload()
