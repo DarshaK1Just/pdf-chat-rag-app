@@ -60,7 +60,7 @@ YOUR ANSWER:"""
         """
         self.retriever = retriever
         self.llm = ChatGroq(
-            model_name=model_name,
+            model=model_name,
             temperature=temperature,
             groq_api_key=settings.GROQ_API_KEY
         )
