@@ -2,6 +2,7 @@
 PDF Chat RAG Application - Main Streamlit App
 """
 import streamlit as st
+import os
 
 from config.settings import settings
 from src.utils.logger import logger
