@@ -11,7 +11,8 @@ A Retrieval-Augmented Generation (RAG) application that allows users to chat wit
 - Conversation memory for context-aware responses
 - Clean and intuitive UI
 
-<img width="1919" height="1028" alt="image" src="https://github.com/user-attachments/assets/03f54eaa-0d96-40c7-b05b-ba04f5d5f23b" />
+<img width="1919" height="1031" alt="image" src="https://github.com/user-attachments/assets/3ed7ddef-60a3-4cdc-b0b1-36684788029d" />
+
 
 
 ## Project Structure
