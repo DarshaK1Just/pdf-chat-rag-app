@@ -1,6 +1,6 @@
 <<<<<<< HEAD
 # Environment variables
-.env
+
 .env.local
 
 # Python
