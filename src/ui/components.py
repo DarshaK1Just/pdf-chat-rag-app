@@ -3,7 +3,7 @@ Reusable UI components for the Streamlit application.
 """
 import streamlit as st
 from typing import List
-from langchain.schema import BaseMessage
+from langchain_core.messages import BaseMessage
 
 from src.ui.templates import USER_TEMPLATE, BOT_TEMPLATE
 

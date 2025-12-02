@@ -1,141 +1,173 @@
 """
-RAG chain service for question answering.
+RAG chain service for question answering — fully updated for the new LangChain API.
 """
-from typing import Tuple, List
-from langchain.prompts import ChatPromptTemplate
-from langchain.memory import ConversationBufferMemory
-from langchain_groq import ChatGroq
-from langchain_core.messages import BaseMessage
+from typing import Tuple, List, Dict
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.messages import BaseMessage, HumanMessage, AIMessage
+from langchain_core.runnables import RunnableWithMessageHistory
+from langchain_openai import ChatOpenAI
 
 from config.settings import settings
 from src.utils.logger import logger
 
 
+# ---------------------------------------------------------
+# Memory Store (Custom — Required by new LangChain API)
+# ---------------------------------------------------------
+class InMemoryChatHistory:
+    """Simple chat history store compatible with RunnableWithMessageHistory."""
+
+    def __init__(self):
+        self.messages: List[BaseMessage] = []
+
+    # Required by RunnableWithMessageHistory
+    def add_messages(self, messages: List[BaseMessage]):
+        """Add a list of messages (user or AI) to the history."""
+        self.messages.extend(messages)
+
+    def get_messages(self) -> List[BaseMessage]:
+        return self.messages
+
+    def clear(self):
+        self.messages = []
+
+
+
+# ---------------------------------------------------------
+# RAGChain Implementation
+# ---------------------------------------------------------
 class RAGChain:
-    """Retrieval-Augmented Generation chain for question answering."""
-    
-    PROMPT_TEMPLATE = """You are an expert document analyst providing clear, accurate, and well-organized answers from PDF documents.
+    """Retrieval-Augmented Generation chain using the modern LangChain architecture."""
+
+    PROMPT_TEMPLATE = """
+You are an expert document analyst providing precise, clear, and well-structured answers from PDF documents.
 
 CORE PRINCIPLES:
-1. Extract and present ONLY relevant information that directly answers the question
-2. Organize information logically with clear structure
-3. Be comprehensive but eliminate redundancy and unnecessary repetition
-4. Use formatting strategically (bullets, numbered lists) for clarity
-5. Focus on substance over form - avoid meta-commentary about the document itself
+1. Extract ONLY relevant information that answers the question
+2. Use clear organization — bullets, headings, logical structure
+3. Avoid redundancy and vague language
+4. No filler phrases like "the document says" or "according to context"
+5. If information is missing: say "This information is not available in the document"
 
 CHAT HISTORY:
 {chat_history}
 
-USER QUESTION:
+QUESTION:
 {question}
 
 DOCUMENT CONTEXT:
 {context}
 
-ANSWER REQUIREMENTS:
-✓ Answer directly based on the context above
-✓ Structure complex information with clear headings and bullets
-✓ Present facts, data, and key points without repetition
-✓ For summaries: focus on main ideas and essential details only
-✓ For specific questions: provide precise answers with relevant context
-✓ Avoid phrases like "the document mentions" or "according to the context"
-✓ Don't repeat the same information in different sections
-✓ If information is missing, state: "This information is not available in the document"
+YOUR ANSWER:
+"""
 
-YOUR ANSWER:"""
-    
     def __init__(
         self,
         retriever,
         model_name: str = settings.LLM_MODEL,
-        temperature: float = settings.LLM_TEMPERATURE
+        temperature: float = settings.LLM_TEMPERATURE,
     ):
         """
-        Initialize RAG chain.
-        
         Args:
-            retriever: Document retriever
-            model_name: LLM model name
-            temperature: LLM temperature
+            retriever: Vector retriever instance
+            model_name: Groq model (e.g., "mixtral-8x7b")
+            temperature: LLM creativity level
         """
         self.retriever = retriever
-        self.llm = ChatGroq(
+
+        # NEW: Use ChatOpenAI with Groq's API endpoint
+        self.llm = ChatOpenAI(
             model=model_name,
-            temperature=temperature
+            temperature=temperature,
+            api_key=settings.GROQ_API_KEY,
+            base_url="https://api.groq.com/openai/v1",
         )
-        self.memory = ConversationBufferMemory(
-            memory_key="chat_history",
-            return_messages=True
-        )
+
+        # Build prompt template
         self.prompt = ChatPromptTemplate.from_template(self.PROMPT_TEMPLATE)
-        
-        logger.info(f"✓ RAG chain ready with model: {model_name}")
-    
+
+        # Chat history store (keyed by session_id)
+        self.history_store: Dict[str, InMemoryChatHistory] = {
+            "default": InMemoryChatHistory()
+        }
+
+        # Runnable chain with message history
+        self.chain = RunnableWithMessageHistory(
+            self._base_chain(),
+            self._get_chat_history,
+            input_messages_key="question",
+            history_messages_key="chat_history",
+        )
+
+        logger.info(f"✓ RAG chain initialized using model: {model_name}")
+
+    # ---------------------------------------------------------
+    # Runnable chain logic
+    # ---------------------------------------------------------
+    def _base_chain(self):
+        """LLM chain pipeline structure."""
+        return self.prompt | self.llm
+
+    def _get_chat_history(self, session_id: str):
+        """Get chat history for the active session."""
+        return self.history_store[session_id]
+
+    # ---------------------------------------------------------
+    # Helper for formatting memory
+    # ---------------------------------------------------------
     def _format_chat_history(self, messages: List[BaseMessage]) -> str:
-        """
-        Format chat history for prompt.
-        
-        Args:
-            messages: List of chat messages
-            
-        Returns:
-            str: Formatted chat history
-        """
         if not messages:
             return "No previous conversation"
-        
+
         formatted = []
         for msg in messages:
-            role = "User" if msg.type == "human" else "Assistant"
+            role = "User" if isinstance(msg, HumanMessage) else "Assistant"
             formatted.append(f"{role}: {msg.content}")
+
         return "\n".join(formatted)
-    
+
+    # ---------------------------------------------------------
+    # Main ask() method
+    # ---------------------------------------------------------
     def ask(self, question: str) -> Tuple[str, List[BaseMessage]]:
-        """
-        Ask a question and get response.
-        
-        Args:
-            question: User question
-            
-        Returns:
-            Tuple[str, List[BaseMessage]]: Answer and chat history
-        """
+        """Generate an answer using RAG with memory."""
+
         try:
-            # Retrieve relevant documents
-            docs = self.retriever.get_relevant_documents(question)
+            # Pull relevant chunks from FAISS or other retriever
+            docs = self.retriever.invoke(question)
             context = "\n\n".join([d.page_content for d in docs])
-            
-            # Get chat history
-            chat_history = self.memory.load_memory_variables({})["chat_history"]
-            formatted_history = self._format_chat_history(chat_history)
-            
-            # Format prompt
-            final_prompt = self.prompt.format(
-                question=question,
-                context=context,
-                chat_history=formatted_history
+
+            # Run the chain
+            response = self.chain.invoke(
+                {
+                    "question": question,
+                    "context": context,
+                    "chat_history": "",  # Populated automatically
+                },
+                config={"session_id": "default"},
             )
-            
-            # Get response
-            response = self.llm.invoke(final_prompt)
-            
-            # Save to memory
-            self.memory.save_context(
-                {"input": question},
-                {"output": response.content}
-            )
-            
-            logger.info(f"✓ Response generated for: '{question[:50]}...'")
-            
-            # Return response and updated history
-            updated_history = self.memory.load_memory_variables({})["chat_history"]
-            return response.content, updated_history
-            
+
+            answer = response.content
+
+            # Update memory manually
+            history = self.history_store["default"]
+            history.add_messages([
+                HumanMessage(content=question),
+                AIMessage(content=answer)
+            ])
+
+            logger.info(f"✓ RAG answer generated for: {question[:50]}...")
+
+            return answer, history.get_messages()
+
         except Exception as e:
-            logger.error(f"Error in RAG chain: {str(e)}")
+            logger.error(f"❌ RAGChain error: {str(e)}")
             raise
-    
-    def clear_memory(self) -> None:
-        """Clear conversation memory."""
-        self.memory.clear()
+
+    # ---------------------------------------------------------
+    # Memory clearing
+    # ---------------------------------------------------------
+    def clear_memory(self):
+        """Reset conversation memory."""
+        self.history_store["default"].clear()
         logger.info("✓ Chat history cleared")
