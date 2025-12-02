@@ -29,6 +29,7 @@ huggingface-hub
 idna
 importlib-metadata
 langchain
+langchain-community
 mypy-extensions
 networkx
 nltk
