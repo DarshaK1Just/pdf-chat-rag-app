@@ -16,6 +16,7 @@ from src.ui.components import (
     render_clear_button
 )
 
+os.environ["GROQ_API_KEY"] = st.secrets["GROQ_API_KEY"]
 
 def initialize_session_state() -> None:
     """Initialize Streamlit session state variables."""
