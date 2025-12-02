@@ -2,8 +2,8 @@
 Vector store service for document embeddings and retrieval.
 """
 from typing import List
-from langchain.embeddings import HuggingFaceEmbeddings
-from langchain.vectorstores import FAISS
+from langchain_huggingface.embeddings import HuggingFaceEmbeddings
+from langchain_community.vectorstores import FAISS
 from langchain.schema import Document
 
 from config.settings import settings
