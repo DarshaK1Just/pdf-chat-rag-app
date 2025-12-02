@@ -11,16 +11,12 @@ from config.settings import settings
 from src.utils.logger import logger
 
 
-# ---------------------------------------------------------
-# Memory Store (Custom — Required by new LangChain API)
-# ---------------------------------------------------------
 class InMemoryChatHistory:
     """Simple chat history store compatible with RunnableWithMessageHistory."""
 
     def __init__(self):
         self.messages: List[BaseMessage] = []
 
-    # Required by RunnableWithMessageHistory
     def add_messages(self, messages: List[BaseMessage]):
         """Add a list of messages (user or AI) to the history."""
         self.messages.extend(messages)
@@ -33,9 +29,6 @@ class InMemoryChatHistory:
 
 
 
-# ---------------------------------------------------------
-# RAGChain Implementation
-# ---------------------------------------------------------
 class RAGChain:
     """Retrieval-Augmented Generation chain using the modern LangChain architecture."""
 
@@ -75,7 +68,6 @@ YOUR ANSWER:
         """
         self.retriever = retriever
 
-        # NEW: Use ChatOpenAI with Groq's API endpoint
         self.llm = ChatOpenAI(
             model=model_name,
             temperature=temperature,
@@ -83,15 +75,12 @@ YOUR ANSWER:
             base_url="https://api.groq.com/openai/v1",
         )
 
-        # Build prompt template
         self.prompt = ChatPromptTemplate.from_template(self.PROMPT_TEMPLATE)
 
-        # Chat history store (keyed by session_id)
         self.history_store: Dict[str, InMemoryChatHistory] = {
             "default": InMemoryChatHistory()
         }
 
-        # Runnable chain with message history
         self.chain = RunnableWithMessageHistory(
             self._base_chain(),
             self._get_chat_history,
@@ -101,9 +90,7 @@ YOUR ANSWER:
 
         logger.info(f"✓ RAG chain initialized using model: {model_name}")
 
-    # ---------------------------------------------------------
-    # Runnable chain logic
-    # ---------------------------------------------------------
+
     def _base_chain(self):
         """LLM chain pipeline structure."""
         return self.prompt | self.llm
@@ -112,9 +99,6 @@ YOUR ANSWER:
         """Get chat history for the active session."""
         return self.history_store[session_id]
 
-    # ---------------------------------------------------------
-    # Helper for formatting memory
-    # ---------------------------------------------------------
     def _format_chat_history(self, messages: List[BaseMessage]) -> str:
         if not messages:
             return "No previous conversation"
@@ -126,30 +110,24 @@ YOUR ANSWER:
 
         return "\n".join(formatted)
 
-    # ---------------------------------------------------------
-    # Main ask() method
-    # ---------------------------------------------------------
     def ask(self, question: str) -> Tuple[str, List[BaseMessage]]:
         """Generate an answer using RAG with memory."""
 
         try:
-            # Pull relevant chunks from FAISS or other retriever
             docs = self.retriever.invoke(question)
             context = "\n\n".join([d.page_content for d in docs])
 
-            # Run the chain
             response = self.chain.invoke(
                 {
                     "question": question,
                     "context": context,
-                    "chat_history": "",  # Populated automatically
+                    "chat_history": "",
                 },
                 config={"session_id": "default"},
             )
 
             answer = response.content
 
-            # Update memory manually
             history = self.history_store["default"]
             history.add_messages([
                 HumanMessage(content=question),
@@ -164,9 +142,6 @@ YOUR ANSWER:
             logger.error(f"❌ RAGChain error: {str(e)}")
             raise
 
-    # ---------------------------------------------------------
-    # Memory clearing
-    # ---------------------------------------------------------
     def clear_memory(self):
         """Reset conversation memory."""
         self.history_store["default"].clear()
