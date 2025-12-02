@@ -43,7 +43,6 @@ Pillow
 protobuf
 psutil
 py-cpuinfo
-pyarrow
 pydantic
 pydantic_core
 pydeck
