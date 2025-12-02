@@ -31,7 +31,7 @@ importlib-metadata
 langchain
 langchain-community
 langchain-huggingface
-langchain-grok
+langchain-groq
 mypy-extensions
 networkx
 nltk
