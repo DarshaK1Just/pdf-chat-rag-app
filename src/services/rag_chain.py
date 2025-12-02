@@ -5,7 +5,7 @@ from typing import Tuple, List
 from langchain.prompts import ChatPromptTemplate
 from langchain.memory import ConversationBufferMemory
 from langchain_groq import ChatGroq
-from langchain.schema import BaseMessage
+from langchain_core.messages import BaseMessage
 
 from config.settings import settings
 from src.utils.logger import logger
