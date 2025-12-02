@@ -1,4 +1,5 @@
 # PDF Chat RAG Application
+Application Live : https://pdf-chat-rag-app.streamlit.app/
 
 A Retrieval-Augmented Generation (RAG) application that allows users to chat with their PDF documents using Groq LLM and LangChain.
 
