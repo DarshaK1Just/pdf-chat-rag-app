@@ -61,8 +61,7 @@ YOUR ANSWER:"""
         self.retriever = retriever
         self.llm = ChatGroq(
             model=model_name,
-            temperature=temperature,
-            groq_api_key=settings.GROQ_API_KEY
+            temperature=temperature
         )
         self.memory = ConversationBufferMemory(
             memory_key="chat_history",
